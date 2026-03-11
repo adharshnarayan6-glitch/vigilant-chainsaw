@@ -1,0 +1,609 @@
+{
+  "name": "Doctor Appointment Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "f1a2b3c4-1001-4001-a001-100000000001",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        340
+      ],
+      "webhookId": "f1a2b3c4-1001-4001-a001-100000000099",
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-credential-id",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.message.chat.id.toString() }}",
+        "contextWindowLength": 20
+      },
+      "id": "f1a2b3c4-2002-4002-a002-200000000002",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.2,
+      "position": [
+        440,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-1.5-flash",
+        "options": {
+          "temperature": 0.3,
+          "maxOutputTokens": 1024
+        }
+      },
+      "id": "f1a2b3c4-3003-4003-a003-300000000003",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        640,
+        580
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "google-gemini-credential-id",
+          "name": "Google Gemini API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "agentType": "toolsAgent",
+        "promptType": "define",
+        "text": "={{ $json.message.text }}",
+        "hasOutputParser": false,
+        "options": {
+          "systemMessage": "You are a professional medical clinic assistant. Help patients manage their doctor appointments. Maintain a professional and courteous tone at all times. Do not use emojis in any of your responses.\n\nENVIRONMENT NOTES:\n- Google Sheets spreadsheet ID is stored in environment variable SPREADSHEET_ID.\n- Google Calendar ID is stored in GOOGLE_CALENDAR_ID (defaults to 'primary').\n- Clinic timezone UTC offset is stored in CLINIC_TIMEZONE_OFFSET (e.g. '+05:30'). Always pass this as timezoneOffset when creating or updating calendar events.\n\nAVAILABLE TOOLS:\n- list_doctors: List all available doctors and their specialties.\n- check_availability: Check whether a time slot is available. Returns a JSON object with an 'available' boolean field. available=true means the slot is free; available=false means it is taken.\n- book_appointment: Record a new appointment in Google Sheets.\n- add_to_google_calendar: Create a Google Calendar event and return its calendarEventId.\n- update_calendar_event_id: Write the calendarEventId from the calendar step back to the Appointments sheet row so it can be used for rescheduling and cancellation.\n- view_appointments: Retrieve all appointment records including row_number and calendarEventId. Filter the result by patient name, phone, doctor, or date as needed.\n- reschedule_appointment: Update an appointment date/time in Google Sheets using the row_number from view_appointments.\n- update_google_calendar: Update the Google Calendar event for a rescheduled appointment.\n- cancel_appointment: Mark an appointment as Cancelled in Google Sheets using the row_number from view_appointments.\n- delete_google_calendar_event: Delete the Google Calendar event for a cancelled appointment.\n\nBOOKING FLOW (follow this exact sequence):\n1. Collect: patient name, phone number, preferred doctor, date (YYYY-MM-DD), and time (HH:MM).\n2. Call check_availability with doctorName, date, and time.\n   - If the result has available=true, the slot is free. Proceed to step 3.\n   - If the result has available=false, the slot is taken. Inform the patient and ask for an alternative time. Do not proceed.\n3. Call book_appointment to create the Sheets record.\n4. Call add_to_google_calendar to create the calendar event. Note the calendarEventId from the response.\n5. Immediately call update_calendar_event_id with patientName, phone, doctorName, date, time, and the calendarEventId from step 4. This step is required.\n6. Confirm the completed booking to the patient.\n\nRESCHEDULING FLOW (follow this exact sequence):\n1. Collect: patient name, phone, doctor, current date/time, new date/time.\n2. Call view_appointments to retrieve the appointment row. Note the row_number and calendarEventId from the matching row.\n3. Call check_availability for the new date/time to confirm the slot is free.\n4. Call reschedule_appointment with the row_number from step 2 and the new date/time.\n5. If calendarEventId was found in step 2, call update_google_calendar with that calendarEventId and the new date/time.\n   If calendarEventId is absent, inform the patient the calendar entry could not be updated automatically and they should update it manually. Do not call update_google_calendar without a valid calendarEventId.\n6. Confirm the rescheduled appointment to the patient.\n\nCANCELLATION FLOW (follow this exact sequence):\n1. Collect: patient name, phone, doctor, date, and time.\n2. Call view_appointments to retrieve the appointment row. Note the row_number and calendarEventId from the matching row.\n3. Call cancel_appointment with the row_number from step 2.\n4. If calendarEventId was found in step 2, call delete_google_calendar_event with it.\n   If calendarEventId is absent, inform the patient the calendar entry could not be deleted automatically and they should remove it manually. Do not call delete_google_calendar_event without a valid calendarEventId.\n5. Confirm the cancellation to the patient.\n\nAlways confirm details with the patient before making any changes."
+        }
+      },
+      "id": "f1a2b3c4-4004-4004-a004-400000000004",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        640,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env['SPREADSHEET_ID'] }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Doctors",
+          "mode": "name"
+        },
+        "filtersUI": {},
+        "options": {},
+        "description": "List all available doctors and their specialties from the Doctors sheet. Returns an array of rows with DoctorName, Specialty, Availability, and ConsultationFee."
+      },
+      "id": "f1a2b3c4-5005-4005-a005-500000000005",
+      "name": "List Doctors Tool",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        80,
+        580
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-credential-id",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "check_availability",
+        "description": "Checks whether a specific time slot is available for a given doctor on a given date. Input must be a JSON object with: doctorName (string), date (YYYY-MM-DD), time (HH:MM). Returns a JSON object with an 'available' boolean field. available=true means the slot IS FREE and booking can proceed. available=false means the slot IS TAKEN and an alternative must be offered. Never book a slot that returns available=false.",
+        "language": "javaScript",
+        "jsCode": "// Input: { \"doctorName\": \"...\", \"date\": \"YYYY-MM-DD\", \"time\": \"HH:MM\" }\nlet params;\ntry {\n  params = JSON.parse(query);\n} catch (e) {\n  return JSON.stringify({ success: false, message: 'Invalid JSON input: ' + e.message });\n}\nconst { doctorName, date, time } = params;\n\nconst spreadsheetId = $env['SPREADSHEET_ID'];\nconst range = 'Appointments!A2:G';\n\nconst response = await this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleSheetsOAuth2Api',\n  {\n    method: 'GET',\n    url: 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/' + range,\n  }\n);\n\n// \u2500\u2500 LOGIC TRAP \u2500\u2500\n// An empty (or absent) values array means no appointments exist at all \u2192 slot is available.\n// A non-empty filtered conflicts array means the slot is already taken.\nif (!response.values || response.values.length === 0) {\n  return JSON.stringify({ available: true, message: 'The requested slot is available.' });\n}\n\n// Columns: A=PatientName, B=Phone, C=DoctorName, D=Date, E=Time, F=Status, G=CalendarEventId\nconst conflicts = response.values.filter(row => {\n  const rowDoctor = (row[2] || '').trim().toLowerCase();\n  const rowDate   = (row[3] || '').trim();\n  const rowTime   = (row[4] || '').trim();\n  const rowStatus = (row[5] || '').trim().toLowerCase();\n  return (\n    rowDoctor === doctorName.trim().toLowerCase() &&\n    rowDate   === date.trim() &&\n    rowTime   === time.trim() &&\n    rowStatus !== 'cancelled'\n  );\n});\n\nif (conflicts.length === 0) {\n  return JSON.stringify({ available: true, message: 'The requested slot is available.' });\n}\n\nreturn JSON.stringify({\n  available: false,\n  message: 'The requested slot is already booked.',\n  conflicts: conflicts.map(row => ({\n    patientName: row[0] || '',\n    phone:       row[1] || '',\n    status:      row[5] || '',\n  })),\n});"
+      },
+      "id": "f1a2b3c4-6006-4006-a006-600000000006",
+      "name": "Check Availability Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        580
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-credential-id",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env['SPREADSHEET_ID'] }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "PatientName": "={{ $fromAI('patientName', 'Patient full name') }}",
+            "Phone": "={{ $fromAI('phone', 'Patient phone number') }}",
+            "DoctorName": "={{ $fromAI('doctorName', 'Doctor full name') }}",
+            "Date": "={{ $fromAI('date', 'Appointment date in YYYY-MM-DD format') }}",
+            "Time": "={{ $fromAI('time', 'Appointment time in HH:MM format') }}",
+            "Status": "Booked",
+            "CalendarEventId": ""
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {},
+        "description": "Record a new appointment in the Google Sheets Appointments table. Input: patientName, phone, doctorName, date (YYYY-MM-DD), time (HH:MM). Sets Status to 'Booked' and leaves CalendarEventId blank (populated later by update_calendar_event_id)."
+      },
+      "id": "f1a2b3c4-7007-4007-a007-700000000007",
+      "name": "Book Appointment Tool",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        400,
+        580
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-credential-id",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "add_to_google_calendar",
+        "description": "Creates a new Google Calendar event for a booked appointment. Input must be a JSON object with: patientName, doctorName, date (YYYY-MM-DD), time (HH:MM). Optional fields: timezoneOffset (e.g. '+05:30'; defaults to CLINIC_TIMEZONE_OFFSET env var or UTC), summary, description. Returns a JSON object with calendarEventId. IMPORTANT: After this tool returns, immediately call update_calendar_event_id with the calendarEventId to persist it to the Appointments sheet.",
+        "language": "javaScript",
+        "jsCode": "// Input: { \"patientName\": \"...\", \"doctorName\": \"...\", \"date\": \"YYYY-MM-DD\", \"time\": \"HH:MM\",\n//          \"timezoneOffset\": \"+HH:MM\" (optional, defaults to env CLINIC_TIMEZONE_OFFSET or \"+00:00\"),\n//          \"summary\": \"...\", \"description\": \"...\" }\n// Dates are constructed as ISO 8601 with explicit timezone offset to avoid ambiguous local-time parsing.\nlet params;\ntry {\n  params = JSON.parse(query);\n} catch (e) {\n  return JSON.stringify({ success: false, message: 'Invalid JSON input: ' + e.message });\n}\nconst { patientName, doctorName, date, time, summary, description } = params;\nconst tzOffset = params.timezoneOffset || $env['CLINIC_TIMEZONE_OFFSET'] || '+00:00';\n\nconst calendarId = $env['GOOGLE_CALENDAR_ID'] || 'primary';\n\n// Build RFC3339 start/end with explicit timezone offset (avoids local-time ambiguity)\nconst startDateTimeStr = date + 'T' + time + ':00' + tzOffset;\nconst startMs = new Date(startDateTimeStr).getTime();\nif (isNaN(startMs)) {\n  return JSON.stringify({ success: false, message: 'Invalid date or time format. Use YYYY-MM-DD and HH:MM.' });\n}\nconst endMs = startMs + 30 * 60 * 1000;\n\nfunction toRFC3339(ms, offset) {\n  const d = new Date(ms);\n  const pad = n => String(n).padStart(2, '0');\n  const sign = offset.startsWith('-') ? -1 : 1;\n  const parts = offset.replace('+', '').replace('-', '').split(':');\n  const offsetMinutes = sign * (parseInt(parts[0], 10) * 60 + parseInt(parts[1] || '0', 10));\n  const localMs = ms + offsetMinutes * 60000;\n  const ld = new Date(localMs);\n  return ld.getUTCFullYear() + '-' + pad(ld.getUTCMonth() + 1) + '-' + pad(ld.getUTCDate()) +\n         'T' + pad(ld.getUTCHours()) + ':' + pad(ld.getUTCMinutes()) + ':' + pad(ld.getUTCSeconds()) +\n         offset;\n}\n\nconst startRFC = toRFC3339(startMs, tzOffset);\nconst endRFC   = toRFC3339(endMs,   tzOffset);\n\nconst event = {\n  summary:     summary || ('Appointment: ' + patientName + ' with Dr. ' + doctorName),\n  description: description || ('Patient: ' + patientName + ' | Doctor: ' + doctorName),\n  start:  { dateTime: startRFC },\n  end:    { dateTime: endRFC },\n};\n\nconst createdEvent = await this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleCalendarOAuth2Api',\n  {\n    method: 'POST',\n    url: 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calendarId) + '/events',\n    body: event,\n  }\n);\n\nreturn JSON.stringify({\n  success: true,\n  calendarEventId: createdEvent.id,\n  htmlLink: createdEvent.htmlLink || '',\n  message: 'Calendar event created. CalendarEventId: ' + createdEvent.id,\n});"
+      },
+      "id": "f1a2b3c4-8008-4008-a008-800000000008",
+      "name": "Add to Google Calendar Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        580
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "google-calendar-credential-id",
+          "name": "Google Calendar OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env['SPREADSHEET_ID'] }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "PatientName": "={{ $fromAI('patientName', 'Patient full name \u2014 used to locate the appointment row') }}",
+            "Phone": "={{ $fromAI('phone', 'Patient phone number \u2014 used to locate the appointment row') }}",
+            "DoctorName": "={{ $fromAI('doctorName', 'Doctor name \u2014 used to locate the appointment row') }}",
+            "Date": "={{ $fromAI('date', 'Appointment date (YYYY-MM-DD) \u2014 used to locate the appointment row') }}",
+            "Time": "={{ $fromAI('time', 'Appointment time (HH:MM) \u2014 used to locate the appointment row') }}",
+            "CalendarEventId": "={{ $fromAI('calendarEventId', 'Google Calendar event ID returned by add_to_google_calendar. Required.') }}"
+          },
+          "matchingColumns": [
+            "PatientName",
+            "Phone",
+            "DoctorName",
+            "Date",
+            "Time"
+          ],
+          "schema": []
+        },
+        "options": {},
+        "description": "Persist the calendarEventId returned by add_to_google_calendar into the Appointments sheet (CalendarEventId column) for the matching appointment row. Input: patientName, phone, doctorName, date (YYYY-MM-DD), time (HH:MM), calendarEventId. calendarEventId must be a non-empty string from add_to_google_calendar \u2014 do not call this tool without it. Matches on PatientName + Phone + DoctorName + Date + Time."
+      },
+      "id": "f1a2b3c4-9009-4009-a009-900000000009",
+      "name": "Update CalendarEventId Tool",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        720,
+        580
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-credential-id",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env['SPREADSHEET_ID'] }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "filtersUI": {},
+        "options": {},
+        "description": "Retrieve all appointment records from the Appointments sheet. Each row includes row_number, PatientName, Phone, DoctorName, Date, Time, Status, and CalendarEventId. Always call this before rescheduling or cancelling to obtain the row_number and calendarEventId needed for those operations. After receiving the results, identify the matching appointment by comparing patientName, phone, doctorName, date, and/or time."
+      },
+      "id": "f1a2b3c4-a010-4010-a010-a10000000010",
+      "name": "View Appointments Tool",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        880,
+        580
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-credential-id",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env['SPREADSHEET_ID'] }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $fromAI('rowNumber', 'Row number of the appointment obtained from view_appointments') }}",
+            "Date": "={{ $fromAI('newDate', 'New appointment date in YYYY-MM-DD format') }}",
+            "Time": "={{ $fromAI('newTime', 'New appointment time in HH:MM format') }}",
+            "Status": "Rescheduled"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": []
+        },
+        "options": {},
+        "description": "Update an existing appointment's date and time in the Google Sheets Appointments table. Input: rowNumber (obtained from view_appointments), newDate (YYYY-MM-DD), newTime (HH:MM). Sets Status to 'Rescheduled'. After calling this, call update_google_calendar with the calendarEventId also obtained from view_appointments."
+      },
+      "id": "f1a2b3c4-b011-4011-a011-b11000000011",
+      "name": "Reschedule Appointment Tool",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1040,
+        580
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-credential-id",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "update_google_calendar",
+        "description": "Updates an existing Google Calendar event for a rescheduled appointment. Input must be a JSON object with: calendarEventId (REQUIRED, from view_appointments), newDate (YYYY-MM-DD), newTime (HH:MM). Optional fields: timezoneOffset (e.g. '+05:30'; defaults to CLINIC_TIMEZONE_OFFSET env var or UTC), summary, description. If calendarEventId is missing or empty, this tool returns an error immediately without making any API call. In that case, inform the patient and skip this step.",
+        "language": "javaScript",
+        "jsCode": "// Input: { \"calendarEventId\": \"...\", \"newDate\": \"YYYY-MM-DD\", \"newTime\": \"HH:MM\",\n//          \"timezoneOffset\": \"+HH:MM\" (optional),\n//          \"summary\": \"...\", \"description\": \"...\" }\n// calendarEventId is mandatory. If missing, the tool returns an error without making any API call.\nlet params;\ntry {\n  params = JSON.parse(query);\n} catch (e) {\n  return JSON.stringify({ success: false, message: 'Invalid JSON input: ' + e.message });\n}\nconst { calendarEventId, newDate, newTime, summary, description } = params;\n\nif (!calendarEventId) {\n  return JSON.stringify({\n    success: false,\n    message: 'calendarEventId is missing. Retrieve it from view_appointments first. The Google Calendar entry has not been updated.',\n  });\n}\n\nconst tzOffset = params.timezoneOffset || $env['CLINIC_TIMEZONE_OFFSET'] || '+00:00';\nconst calendarId = $env['GOOGLE_CALENDAR_ID'] || 'primary';\n\nconst startDateTimeStr = newDate + 'T' + newTime + ':00' + tzOffset;\nconst startMs = new Date(startDateTimeStr).getTime();\nif (isNaN(startMs)) {\n  return JSON.stringify({ success: false, message: 'Invalid date or time format. Use YYYY-MM-DD and HH:MM.' });\n}\nconst endMs = startMs + 30 * 60 * 1000;\n\nfunction toRFC3339(ms, offset) {\n  const d = new Date(ms);\n  const pad = n => String(n).padStart(2, '0');\n  const sign = offset.startsWith('-') ? -1 : 1;\n  const parts = offset.replace('+', '').replace('-', '').split(':');\n  const offsetMinutes = sign * (parseInt(parts[0], 10) * 60 + parseInt(parts[1] || '0', 10));\n  const localMs = ms + offsetMinutes * 60000;\n  const ld = new Date(localMs);\n  return ld.getUTCFullYear() + '-' + pad(ld.getUTCMonth() + 1) + '-' + pad(ld.getUTCDate()) +\n         'T' + pad(ld.getUTCHours()) + ':' + pad(ld.getUTCMinutes()) + ':' + pad(ld.getUTCSeconds()) +\n         offset;\n}\n\nconst patchBody = {\n  start: { dateTime: toRFC3339(startMs, tzOffset) },\n  end:   { dateTime: toRFC3339(endMs,   tzOffset) },\n};\nif (summary)     patchBody.summary     = summary;\nif (description) patchBody.description = description;\n\nconst updatedEvent = await this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleCalendarOAuth2Api',\n  {\n    method: 'PATCH',\n    url: 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calendarId) + '/events/' + encodeURIComponent(calendarEventId),\n    body: patchBody,\n  }\n);\n\nreturn JSON.stringify({\n  success: true,\n  message: 'Google Calendar event updated successfully.',\n  eventId: updatedEvent.id,\n  htmlLink: updatedEvent.htmlLink || '',\n});"
+      },
+      "id": "f1a2b3c4-c012-4012-a012-c12000000012",
+      "name": "Update Google Calendar Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        580
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "google-calendar-credential-id",
+          "name": "Google Calendar OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env['SPREADSHEET_ID'] }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $fromAI('rowNumber', 'Row number of the appointment obtained from view_appointments') }}",
+            "Status": "Cancelled"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": []
+        },
+        "options": {},
+        "description": "Mark an existing appointment as Cancelled in the Google Sheets Appointments table. Input: rowNumber (obtained from view_appointments). Sets Status to 'Cancelled'. After calling this, call delete_google_calendar_event with the calendarEventId also obtained from view_appointments."
+      },
+      "id": "f1a2b3c4-d013-4013-a013-d13000000013",
+      "name": "Cancel Appointment Tool",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1360,
+        580
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-credential-id",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "delete_google_calendar_event",
+        "description": "Deletes a Google Calendar event for a cancelled appointment. Input must be a JSON object with: calendarEventId (REQUIRED, from view_appointments). If calendarEventId is missing or empty, this tool returns an error immediately without making any API call. In that case, inform the patient and skip this step.",
+        "language": "javaScript",
+        "jsCode": "// Input: { \"calendarEventId\": \"...\" }\n// calendarEventId is mandatory. If missing, the tool returns an error without making any API call.\nlet params;\ntry {\n  params = JSON.parse(query);\n} catch (e) {\n  return JSON.stringify({ success: false, message: 'Invalid JSON input: ' + e.message });\n}\nconst { calendarEventId } = params;\n\nif (!calendarEventId) {\n  return JSON.stringify({\n    success: false,\n    message: 'calendarEventId is missing. Retrieve it from view_appointments first. The Google Calendar entry has not been deleted.',\n  });\n}\n\nconst calendarId = $env['GOOGLE_CALENDAR_ID'] || 'primary';\n\nawait this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleCalendarOAuth2Api',\n  {\n    method: 'DELETE',\n    url: 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calendarId) + '/events/' + encodeURIComponent(calendarEventId),\n  }\n);\n\nreturn JSON.stringify({\n  success: true,\n  message: 'Google Calendar event deleted successfully. CalendarEventId: ' + calendarEventId,\n});"
+      },
+      "id": "f1a2b3c4-e014-4014-a014-e14000000014",
+      "name": "Delete Google Calendar Event Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        1520,
+        580
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "google-calendar-credential-id",
+          "name": "Google Calendar OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "f1a2b3c4-f015-4015-a015-f15000000015",
+      "name": "Send Telegram Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1040,
+        340
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-credential-id",
+          "name": "Telegram Bot"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Doctors Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Availability Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book Appointment Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Google Calendar Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update CalendarEventId Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "View Appointments Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reschedule Appointment Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Google Calendar Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel Appointment Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Google Calendar Event Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f1a2b3c4-0000-4000-a000-000000000000",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f1a2b3c4-0000-4000-a000-ffffffffffff"
+  },
+  "id": "f1a2b3c4-0000-4000-a000-000000000001",
+  "tags": []
+}
