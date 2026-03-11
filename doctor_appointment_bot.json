@@ -69,7 +69,7 @@
         "text": "={{ $json.message.text }}",
         "hasOutputParser": false,
         "options": {
-          "systemMessage": "You are a professional medical clinic assistant. Help patients manage their doctor appointments. Maintain a professional and courteous tone at all times. Do not use emojis in any of your responses.\n\nENVIRONMENT NOTES:\n- Google Sheets spreadsheet ID is stored in environment variable SPREADSHEET_ID.\n- Google Calendar ID is stored in GOOGLE_CALENDAR_ID (defaults to 'primary').\n- Clinic timezone UTC offset is stored in CLINIC_TIMEZONE_OFFSET (e.g. '+05:30'). Always pass this as timezoneOffset when creating or updating calendar events.\n\nAVAILABLE TOOLS:\n- list_doctors: List all available doctors and their specialties.\n- check_availability: Check whether a time slot is available. Returns a JSON object with an 'available' boolean field. available=true means the slot is free; available=false means it is taken.\n- book_appointment: Record a new appointment in Google Sheets.\n- add_to_google_calendar: Create a Google Calendar event and return its calendarEventId.\n- update_calendar_event_id: Write the calendarEventId from the calendar step back to the Appointments sheet row so it can be used for rescheduling and cancellation.\n- view_appointments: Retrieve appointment records including calendarEventId.\n- reschedule_appointment: Update an appointment date/time in Google Sheets.\n- update_google_calendar: Update the Google Calendar event for a rescheduled appointment.\n- cancel_appointment: Mark an appointment as Cancelled in Google Sheets.\n- delete_google_calendar_event: Delete the Google Calendar event for a cancelled appointment.\n\nBOOKING FLOW (follow this exact sequence):\n1. Collect: patient name, phone number, preferred doctor, date (YYYY-MM-DD), and time (HH:MM).\n2. Call check_availability with doctorName, date, and time.\n   - If the result has available=true, the slot is free. Proceed to step 3.\n   - If the result has available=false, the slot is taken. Inform the patient and ask for an alternative time. Do not proceed.\n3. Call book_appointment to create the Sheets record.\n4. Call add_to_google_calendar to create the calendar event. Note the calendarEventId from the response.\n5. Immediately call update_calendar_event_id with patientName, phone, doctorName, date, time, and the calendarEventId from step 4. This step is required.\n6. Confirm the completed booking to the patient.\n\nRESCHEDULING FLOW (follow this exact sequence):\n1. Collect: patient name, phone, doctor, current date/time, new date/time.\n2. Call view_appointments to retrieve the appointment details and calendarEventId.\n3. Call check_availability for the new date/time to confirm the slot is free.\n4. Call reschedule_appointment to update the Sheets record.\n5. If calendarEventId was found in step 2, call update_google_calendar with that calendarEventId and the new date/time.\n   If calendarEventId is absent, inform the patient the calendar entry could not be updated automatically and they should update it manually. Do not call update_google_calendar without a valid calendarEventId.\n6. Confirm the rescheduled appointment to the patient.\n\nCANCELLATION FLOW (follow this exact sequence):\n1. Collect: patient name, phone, doctor, date, and time.\n2. Call view_appointments to retrieve the appointment details and calendarEventId.\n3. Call cancel_appointment to mark the record as Cancelled in Sheets.\n4. If calendarEventId was found in step 2, call delete_google_calendar_event with it.\n   If calendarEventId is absent, inform the patient the calendar entry could not be deleted automatically and they should remove it manually. Do not call delete_google_calendar_event without a valid calendarEventId.\n5. Confirm the cancellation to the patient.\n\nAlways confirm details with the patient before making any changes."
+          "systemMessage": "You are a professional medical clinic assistant. Help patients manage their doctor appointments. Maintain a professional and courteous tone at all times. Do not use emojis in any of your responses.\n\nENVIRONMENT NOTES:\n- Google Sheets spreadsheet ID is stored in environment variable SPREADSHEET_ID.\n- Google Calendar ID is stored in GOOGLE_CALENDAR_ID (defaults to 'primary').\n- Clinic timezone UTC offset is stored in CLINIC_TIMEZONE_OFFSET (e.g. '+05:30'). Always pass this as timezoneOffset when creating or updating calendar events.\n\nAVAILABLE TOOLS:\n- list_doctors: List all available doctors and their specialties.\n- check_availability: Check whether a time slot is available. Returns a JSON object with an 'available' boolean field. available=true means the slot is free; available=false means it is taken.\n- book_appointment: Record a new appointment in Google Sheets.\n- add_to_google_calendar: Create a Google Calendar event and return its calendarEventId.\n- update_calendar_event_id: Write the calendarEventId from the calendar step back to the Appointments sheet row so it can be used for rescheduling and cancellation.\n- view_appointments: Retrieve all appointment records including row_number and calendarEventId. Filter the result by patient name, phone, doctor, or date as needed.\n- reschedule_appointment: Update an appointment date/time in Google Sheets using the row_number from view_appointments.\n- update_google_calendar: Update the Google Calendar event for a rescheduled appointment.\n- cancel_appointment: Mark an appointment as Cancelled in Google Sheets using the row_number from view_appointments.\n- delete_google_calendar_event: Delete the Google Calendar event for a cancelled appointment.\n\nBOOKING FLOW (follow this exact sequence):\n1. Collect: patient name, phone number, preferred doctor, date (YYYY-MM-DD), and time (HH:MM).\n2. Call check_availability with doctorName, date, and time.\n   - If the result has available=true, the slot is free. Proceed to step 3.\n   - If the result has available=false, the slot is taken. Inform the patient and ask for an alternative time. Do not proceed.\n3. Call book_appointment to create the Sheets record.\n4. Call add_to_google_calendar to create the calendar event. Note the calendarEventId from the response.\n5. Immediately call update_calendar_event_id with patientName, phone, doctorName, date, time, and the calendarEventId from step 4. This step is required.\n6. Confirm the completed booking to the patient.\n\nRESCHEDULING FLOW (follow this exact sequence):\n1. Collect: patient name, phone, doctor, current date/time, new date/time.\n2. Call view_appointments to retrieve the appointment row. Note the row_number and calendarEventId from the matching row.\n3. Call check_availability for the new date/time to confirm the slot is free.\n4. Call reschedule_appointment with the row_number from step 2 and the new date/time.\n5. If calendarEventId was found in step 2, call update_google_calendar with that calendarEventId and the new date/time.\n   If calendarEventId is absent, inform the patient the calendar entry could not be updated automatically and they should update it manually. Do not call update_google_calendar without a valid calendarEventId.\n6. Confirm the rescheduled appointment to the patient.\n\nCANCELLATION FLOW (follow this exact sequence):\n1. Collect: patient name, phone, doctor, date, and time.\n2. Call view_appointments to retrieve the appointment row. Note the row_number and calendarEventId from the matching row.\n3. Call cancel_appointment with the row_number from step 2.\n4. If calendarEventId was found in step 2, call delete_google_calendar_event with it.\n   If calendarEventId is absent, inform the patient the calendar entry could not be deleted automatically and they should remove it manually. Do not call delete_google_calendar_event without a valid calendarEventId.\n5. Confirm the cancellation to the patient.\n\nAlways confirm details with the patient before making any changes."
         }
       },
       "id": "f1a2b3c4-4004-4004-a004-400000000004",
@@ -83,15 +83,25 @@
     },
     {
       "parameters": {
-        "name": "list_doctors",
-        "description": "Retrieves the list of available doctors from the clinic database. Use this when a patient asks who the available doctors are, what specialties are offered, or wants general information about the medical team. Returns DoctorName, Specialty, Availability, and ConsultationFee for each doctor.",
-        "language": "javaScript",
-        "jsCode": "const spreadsheetId = $env['SPREADSHEET_ID'];\nconst range = 'Doctors!A2:D';\n\nconst response = await this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleSheetsOAuth2Api',\n  {\n    method: 'GET',\n    url: 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/' + range,\n  }\n);\n\nif (!response.values || response.values.length === 0) {\n  return 'No doctors are currently listed in the system.';\n}\n\n// Columns: A=DoctorName, B=Specialty, C=Availability, D=ConsultationFee\nconst doctors = response.values.map(row => ({\n  DoctorName: row[0] || '',\n  Specialty: row[1] || '',\n  Availability: row[2] || '',\n  ConsultationFee: row[3] || '',\n}));\n\nreturn JSON.stringify(doctors);"
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env['SPREADSHEET_ID'] }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Doctors",
+          "mode": "name"
+        },
+        "filtersUI": {},
+        "options": {},
+        "description": "List all available doctors and their specialties from the Doctors sheet. Returns an array of rows with DoctorName, Specialty, Availability, and ConsultationFee."
       },
       "id": "f1a2b3c4-5005-4005-a005-500000000005",
       "name": "List Doctors Tool",
-      "type": "@n8n/n8n-nodes-langchain.toolCode",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
       "position": [
         80,
         580
@@ -99,7 +109,7 @@
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "google-sheets-credential-id",
-          "name": "Google Sheets OAuth2"
+          "name": "Google Sheets Account"
         }
       }
     },
@@ -127,15 +137,38 @@
     },
     {
       "parameters": {
-        "name": "book_appointment",
-        "description": "Records a new appointment in the Google Sheets Appointments table. Only call this AFTER check_availability returns available=true. Input must be a JSON object with: patientName, phone, doctorName, date (YYYY-MM-DD), time (HH:MM). After this tool succeeds, call add_to_google_calendar and then update_calendar_event_id.",
-        "language": "javaScript",
-        "jsCode": "// Input: { \"patientName\": \"...\", \"phone\": \"...\", \"doctorName\": \"...\", \"date\": \"YYYY-MM-DD\", \"time\": \"HH:MM\" }\nlet params;\ntry {\n  params = JSON.parse(query);\n} catch (e) {\n  return JSON.stringify({ success: false, message: 'Invalid JSON input: ' + e.message });\n}\nconst { patientName, phone, doctorName, date, time } = params;\n\nconst spreadsheetId = $env['SPREADSHEET_ID'];\nconst range = 'Appointments!A:G';\n\n// Append a new row: PatientName | Phone | DoctorName | Date | Time | Status | CalendarEventId (empty placeholder)\nconst appendResponse = await this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleSheetsOAuth2Api',\n  {\n    method: 'POST',\n    url: 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/' + encodeURIComponent(range) + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS',\n    body: {\n      values: [[patientName, phone, doctorName, date, time, 'Booked', '']],\n    },\n  }\n);\n\nreturn JSON.stringify({\n  success: true,\n  message: 'Appointment booked successfully.',\n  updatedRange: appendResponse.updates ? appendResponse.updates.updatedRange : '',\n});"
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env['SPREADSHEET_ID'] }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "PatientName": "={{ $fromAI('patientName', 'Patient full name') }}",
+            "Phone": "={{ $fromAI('phone', 'Patient phone number') }}",
+            "DoctorName": "={{ $fromAI('doctorName', 'Doctor full name') }}",
+            "Date": "={{ $fromAI('date', 'Appointment date in YYYY-MM-DD format') }}",
+            "Time": "={{ $fromAI('time', 'Appointment time in HH:MM format') }}",
+            "Status": "Booked",
+            "CalendarEventId": ""
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {},
+        "description": "Record a new appointment in the Google Sheets Appointments table. Input: patientName, phone, doctorName, date (YYYY-MM-DD), time (HH:MM). Sets Status to 'Booked' and leaves CalendarEventId blank (populated later by update_calendar_event_id)."
       },
       "id": "f1a2b3c4-7007-4007-a007-700000000007",
       "name": "Book Appointment Tool",
-      "type": "@n8n/n8n-nodes-langchain.toolCode",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
       "position": [
         400,
         580
@@ -143,7 +176,7 @@
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "google-sheets-credential-id",
-          "name": "Google Sheets OAuth2"
+          "name": "Google Sheets Account"
         }
       }
     },
@@ -171,15 +204,43 @@
     },
     {
       "parameters": {
-        "name": "update_calendar_event_id",
-        "description": "Persists the calendarEventId returned by add_to_google_calendar into the Google Sheets Appointments table (column G: CalendarEventId) for the matching appointment row. This step is required after every successful calendar event creation so that reschedule and cancel flows can retrieve the calendarEventId later. Input must be a JSON object with: patientName, phone, doctorName, date (YYYY-MM-DD), time (HH:MM), and calendarEventId. The matching row is found by comparing PatientName + Phone + DoctorName + Date + Time.",
-        "language": "javaScript",
-        "jsCode": "// Input: { \"patientName\": \"...\", \"phone\": \"...\", \"doctorName\": \"...\", \"date\": \"YYYY-MM-DD\",\n//          \"time\": \"HH:MM\", \"calendarEventId\": \"...\" }\n// Persists the CalendarEventId returned by Add to Google Calendar Tool into the Appointments sheet\n// column G so that reschedule and cancel operations can retrieve it later.\nlet params;\ntry {\n  params = JSON.parse(query);\n} catch (e) {\n  return JSON.stringify({ success: false, message: 'Invalid JSON input: ' + e.message });\n}\nconst { patientName, phone, doctorName, date, time, calendarEventId } = params;\n\nif (!calendarEventId) {\n  return JSON.stringify({ success: false, message: 'calendarEventId is required.' });\n}\n\nconst spreadsheetId = $env['SPREADSHEET_ID'];\nconst readRange = 'Appointments!A2:G';\n\n// Read the sheet to locate the matching row\nconst readResponse = await this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleSheetsOAuth2Api',\n  {\n    method: 'GET',\n    url: 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/' + readRange,\n  }\n);\n\nif (!readResponse.values || readResponse.values.length === 0) {\n  return JSON.stringify({ success: false, message: 'No appointments found in the sheet.' });\n}\n\n// Columns: A=PatientName, B=Phone, C=DoctorName, D=Date, E=Time, F=Status, G=CalendarEventId\n// Rows are data rows starting at sheet row 2 (index 0 in the values array = row 2).\nlet targetRowIndex = -1;\nfor (let i = 0; i < readResponse.values.length; i++) {\n  const row = readResponse.values[i];\n  const rowPatient = (row[0] || '').trim().toLowerCase();\n  const rowPhone   = (row[1] || '').trim();\n  const rowDoctor  = (row[2] || '').trim().toLowerCase();\n  const rowDate    = (row[3] || '').trim();\n  const rowTime    = (row[4] || '').trim();\n  const rowStatus  = (row[5] || '').trim().toLowerCase();\n  if (\n    rowPatient === patientName.trim().toLowerCase() &&\n    rowPhone   === phone.trim() &&\n    rowDoctor  === doctorName.trim().toLowerCase() &&\n    rowDate    === date.trim() &&\n    rowTime    === time.trim() &&\n    rowStatus  !== 'cancelled'\n  ) {\n    targetRowIndex = i;\n    break;\n  }\n}\n\nif (targetRowIndex === -1) {\n  return JSON.stringify({ success: false, message: 'Matching appointment row not found.' });\n}\n\n// Sheet row number = targetRowIndex + 2 (header occupies row 1, data starts at row 2)\nconst sheetRowNumber = targetRowIndex + 2;\nconst updateRange = 'Appointments!G' + sheetRowNumber;\n\nawait this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleSheetsOAuth2Api',\n  {\n    method: 'PUT',\n    url: 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/' + encodeURIComponent(updateRange) + '?valueInputOption=USER_ENTERED',\n    body: {\n      range: updateRange,\n      majorDimension: 'ROWS',\n      values: [[calendarEventId]],\n    },\n  }\n);\n\nreturn JSON.stringify({\n  success: true,\n  message: 'CalendarEventId saved to Appointments sheet at row ' + sheetRowNumber + '.',\n  sheetRow: sheetRowNumber,\n});"
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env['SPREADSHEET_ID'] }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "PatientName": "={{ $fromAI('patientName', 'Patient full name \u2014 used to locate the appointment row') }}",
+            "Phone": "={{ $fromAI('phone', 'Patient phone number \u2014 used to locate the appointment row') }}",
+            "DoctorName": "={{ $fromAI('doctorName', 'Doctor name \u2014 used to locate the appointment row') }}",
+            "Date": "={{ $fromAI('date', 'Appointment date (YYYY-MM-DD) \u2014 used to locate the appointment row') }}",
+            "Time": "={{ $fromAI('time', 'Appointment time (HH:MM) \u2014 used to locate the appointment row') }}",
+            "CalendarEventId": "={{ $fromAI('calendarEventId', 'Google Calendar event ID returned by add_to_google_calendar. Required.') }}"
+          },
+          "matchingColumns": [
+            "PatientName",
+            "Phone",
+            "DoctorName",
+            "Date",
+            "Time"
+          ],
+          "schema": []
+        },
+        "options": {},
+        "description": "Persist the calendarEventId returned by add_to_google_calendar into the Appointments sheet (CalendarEventId column) for the matching appointment row. Input: patientName, phone, doctorName, date (YYYY-MM-DD), time (HH:MM), calendarEventId. calendarEventId must be a non-empty string from add_to_google_calendar \u2014 do not call this tool without it. Matches on PatientName + Phone + DoctorName + Date + Time."
       },
       "id": "f1a2b3c4-9009-4009-a009-900000000009",
       "name": "Update CalendarEventId Tool",
-      "type": "@n8n/n8n-nodes-langchain.toolCode",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
       "position": [
         720,
         580
@@ -187,21 +248,31 @@
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "google-sheets-credential-id",
-          "name": "Google Sheets OAuth2"
+          "name": "Google Sheets Account"
         }
       }
     },
     {
       "parameters": {
-        "name": "view_appointments",
-        "description": "Retrieves appointment records from the Google Sheets Appointments table. Provide at least one filter in the JSON input: phone, patientName, doctorName, or date (YYYY-MM-DD). Returns appointment details including calendarEventId for each record. IMPORTANT: Always call this tool BEFORE rescheduling or cancelling an appointment to obtain the calendarEventId required for Google Calendar operations.",
-        "language": "javaScript",
-        "jsCode": "// Input: { \"phone\": \"...\" } or { \"patientName\": \"...\" } or { \"doctorName\": \"...\", \"date\": \"YYYY-MM-DD\" }\n// Returns all matching appointments including calendarEventId. Always call this before rescheduling\n// or cancelling to obtain the calendarEventId needed for Google Calendar operations.\nlet params;\ntry {\n  params = JSON.parse(query);\n} catch (e) {\n  return JSON.stringify({ success: false, message: 'Invalid JSON input: ' + e.message });\n}\nconst { phone, patientName, doctorName, date } = params;\n\nconst spreadsheetId = $env['SPREADSHEET_ID'];\nconst range = 'Appointments!A2:G';\n\nconst response = await this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleSheetsOAuth2Api',\n  {\n    method: 'GET',\n    url: 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/' + range,\n  }\n);\n\nif (!response.values || response.values.length === 0) {\n  return JSON.stringify({ appointments: [], message: 'No appointments found.' });\n}\n\n// Columns: A=PatientName, B=Phone, C=DoctorName, D=Date, E=Time, F=Status, G=CalendarEventId\nconst appointments = response.values\n  .map((row, idx) => ({\n    rowNumber:       idx + 2,\n    patientName:     row[0] || '',\n    phone:           row[1] || '',\n    doctorName:      row[2] || '',\n    date:            row[3] || '',\n    time:            row[4] || '',\n    status:          row[5] || '',\n    calendarEventId: row[6] || '',\n  }))\n  .filter(appt => {\n    if (phone       && appt.phone.trim()      !== phone.trim())      return false;\n    if (patientName && appt.patientName.trim().toLowerCase() !== patientName.trim().toLowerCase()) return false;\n    if (doctorName  && appt.doctorName.trim().toLowerCase()  !== doctorName.trim().toLowerCase())  return false;\n    if (date        && appt.date.trim()       !== date.trim())       return false;\n    return true;\n  });\n\nif (appointments.length === 0) {\n  return JSON.stringify({ appointments: [], message: 'No matching appointments found.' });\n}\n\nreturn JSON.stringify({ appointments });"
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env['SPREADSHEET_ID'] }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "filtersUI": {},
+        "options": {},
+        "description": "Retrieve all appointment records from the Appointments sheet. Each row includes row_number, PatientName, Phone, DoctorName, Date, Time, Status, and CalendarEventId. Always call this before rescheduling or cancelling to obtain the row_number and calendarEventId needed for those operations. After receiving the results, identify the matching appointment by comparing patientName, phone, doctorName, date, and/or time."
       },
       "id": "f1a2b3c4-a010-4010-a010-a10000000010",
       "name": "View Appointments Tool",
-      "type": "@n8n/n8n-nodes-langchain.toolCode",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
       "position": [
         880,
         580
@@ -209,21 +280,43 @@
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "google-sheets-credential-id",
-          "name": "Google Sheets OAuth2"
+          "name": "Google Sheets Account"
         }
       }
     },
     {
       "parameters": {
-        "name": "reschedule_appointment",
-        "description": "Updates an existing appointment's date and time in the Google Sheets Appointments table. Input must be a JSON object with: patientName, phone, doctorName, currentDate (YYYY-MM-DD), currentTime (HH:MM), newDate (YYYY-MM-DD), newTime (HH:MM), and calendarEventId (retrieved from view_appointments). If calendarEventId is present, also call update_google_calendar after this tool. If calendarEventId is absent, only the Sheets record is updated and the response will indicate the calendar entry was not updated.",
-        "language": "javaScript",
-        "jsCode": "// Input: { \"patientName\": \"...\", \"phone\": \"...\", \"doctorName\": \"...\",\n//          \"currentDate\": \"YYYY-MM-DD\", \"currentTime\": \"HH:MM\",\n//          \"newDate\": \"YYYY-MM-DD\", \"newTime\": \"HH:MM\",\n//          \"calendarEventId\": \"...\" }\n// The caller MUST retrieve calendarEventId via view_appointments before calling this tool.\n// If calendarEventId is absent, the Sheets record is updated but the response includes a clear\n// message that the calendar entry was not updated.\nlet params;\ntry {\n  params = JSON.parse(query);\n} catch (e) {\n  return JSON.stringify({ success: false, message: 'Invalid JSON input: ' + e.message });\n}\nconst { patientName, phone, doctorName, currentDate, currentTime, newDate, newTime, calendarEventId } = params;\n\nconst spreadsheetId = $env['SPREADSHEET_ID'];\nconst readRange = 'Appointments!A2:G';\n\nconst readResponse = await this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleSheetsOAuth2Api',\n  {\n    method: 'GET',\n    url: 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/' + readRange,\n  }\n);\n\nif (!readResponse.values || readResponse.values.length === 0) {\n  return JSON.stringify({ success: false, message: 'No appointments found in the sheet.' });\n}\n\nlet targetRowIndex = -1;\nfor (let i = 0; i < readResponse.values.length; i++) {\n  const row = readResponse.values[i];\n  if (\n    (row[0] || '').trim().toLowerCase() === patientName.trim().toLowerCase() &&\n    (row[1] || '').trim()               === phone.trim() &&\n    (row[2] || '').trim().toLowerCase() === doctorName.trim().toLowerCase() &&\n    (row[3] || '').trim()               === currentDate.trim() &&\n    (row[4] || '').trim()               === currentTime.trim() &&\n    (row[5] || '').trim().toLowerCase() !== 'cancelled'\n  ) {\n    targetRowIndex = i;\n    break;\n  }\n}\n\nif (targetRowIndex === -1) {\n  return JSON.stringify({ success: false, message: 'Matching active appointment not found.' });\n}\n\nconst sheetRowNumber = targetRowIndex + 2;\n// Update Date (col D), Time (col E), and Status (col F); CalendarEventId (col G) is preserved.\nconst updateRange = 'Appointments!D' + sheetRowNumber + ':F' + sheetRowNumber;\n\nawait this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleSheetsOAuth2Api',\n  {\n    method: 'PUT',\n    url: 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/' + encodeURIComponent(updateRange) + '?valueInputOption=USER_ENTERED',\n    body: {\n      range: updateRange,\n      majorDimension: 'ROWS',\n      values: [[newDate, newTime, 'Rescheduled']],\n    },\n  }\n);\n\nlet calendarNote;\nif (!calendarEventId) {\n  calendarNote = ' Note: CalendarEventId was not provided so the Google Calendar entry was not updated. Please update it manually.';\n} else {\n  calendarNote = ' Use update_google_calendar with calendarEventId \"' + calendarEventId + '\" to update the calendar event.';\n}\n\nreturn JSON.stringify({\n  success: true,\n  message: 'Appointment rescheduled in Google Sheets to ' + newDate + ' at ' + newTime + '.' + calendarNote,\n  sheetRow: sheetRowNumber,\n});"
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env['SPREADSHEET_ID'] }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $fromAI('rowNumber', 'Row number of the appointment obtained from view_appointments') }}",
+            "Date": "={{ $fromAI('newDate', 'New appointment date in YYYY-MM-DD format') }}",
+            "Time": "={{ $fromAI('newTime', 'New appointment time in HH:MM format') }}",
+            "Status": "Rescheduled"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": []
+        },
+        "options": {},
+        "description": "Update an existing appointment's date and time in the Google Sheets Appointments table. Input: rowNumber (obtained from view_appointments), newDate (YYYY-MM-DD), newTime (HH:MM). Sets Status to 'Rescheduled'. After calling this, call update_google_calendar with the calendarEventId also obtained from view_appointments."
       },
       "id": "f1a2b3c4-b011-4011-a011-b11000000011",
       "name": "Reschedule Appointment Tool",
-      "type": "@n8n/n8n-nodes-langchain.toolCode",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
       "position": [
         1040,
         580
@@ -231,7 +324,7 @@
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "google-sheets-credential-id",
-          "name": "Google Sheets OAuth2"
+          "name": "Google Sheets Account"
         }
       }
     },
@@ -259,15 +352,35 @@
     },
     {
       "parameters": {
-        "name": "cancel_appointment",
-        "description": "Marks an existing appointment as Cancelled in the Google Sheets Appointments table. Input must be a JSON object with: patientName, phone, doctorName, date (YYYY-MM-DD), time (HH:MM), and calendarEventId (retrieved from view_appointments). If calendarEventId is present, also call delete_google_calendar_event after this tool. If calendarEventId is absent, only the Sheets record is updated and the response will indicate the calendar entry was not deleted.",
-        "language": "javaScript",
-        "jsCode": "// Input: { \"patientName\": \"...\", \"phone\": \"...\", \"doctorName\": \"...\",\n//          \"date\": \"YYYY-MM-DD\", \"time\": \"HH:MM\", \"calendarEventId\": \"...\" }\n// The caller MUST retrieve calendarEventId via view_appointments before calling this tool.\n// If calendarEventId is absent, the Sheets record is still updated but the response includes a clear\n// message that the calendar entry was not deleted.\nlet params;\ntry {\n  params = JSON.parse(query);\n} catch (e) {\n  return JSON.stringify({ success: false, message: 'Invalid JSON input: ' + e.message });\n}\nconst { patientName, phone, doctorName, date, time, calendarEventId } = params;\n\nconst spreadsheetId = $env['SPREADSHEET_ID'];\nconst readRange = 'Appointments!A2:G';\n\nconst readResponse = await this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleSheetsOAuth2Api',\n  {\n    method: 'GET',\n    url: 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/' + readRange,\n  }\n);\n\nif (!readResponse.values || readResponse.values.length === 0) {\n  return JSON.stringify({ success: false, message: 'No appointments found in the sheet.' });\n}\n\nlet targetRowIndex = -1;\nfor (let i = 0; i < readResponse.values.length; i++) {\n  const row = readResponse.values[i];\n  if (\n    (row[0] || '').trim().toLowerCase() === patientName.trim().toLowerCase() &&\n    (row[1] || '').trim()               === phone.trim() &&\n    (row[2] || '').trim().toLowerCase() === doctorName.trim().toLowerCase() &&\n    (row[3] || '').trim()               === date.trim() &&\n    (row[4] || '').trim()               === time.trim() &&\n    (row[5] || '').trim().toLowerCase() !== 'cancelled'\n  ) {\n    targetRowIndex = i;\n    break;\n  }\n}\n\nif (targetRowIndex === -1) {\n  return JSON.stringify({ success: false, message: 'Matching active appointment not found.' });\n}\n\nconst sheetRowNumber = targetRowIndex + 2;\nconst updateRange = 'Appointments!F' + sheetRowNumber;\n\nawait this.helpers.httpRequestWithAuthentication.call(\n  this,\n  'googleSheetsOAuth2Api',\n  {\n    method: 'PUT',\n    url: 'https://sheets.googleapis.com/v4/spreadsheets/' + spreadsheetId + '/values/' + encodeURIComponent(updateRange) + '?valueInputOption=USER_ENTERED',\n    body: {\n      range: updateRange,\n      majorDimension: 'ROWS',\n      values: [['Cancelled']],\n    },\n  }\n);\n\nlet calendarNote;\nif (!calendarEventId) {\n  calendarNote = ' Note: CalendarEventId was not provided so the Google Calendar entry was not deleted. Please remove it manually.';\n} else {\n  calendarNote = ' Use delete_google_calendar_event with calendarEventId \"' + calendarEventId + '\" to delete the calendar event.';\n}\n\nreturn JSON.stringify({\n  success: true,\n  message: 'Appointment marked as Cancelled in Google Sheets.' + calendarNote,\n  sheetRow: sheetRowNumber,\n});"
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env['SPREADSHEET_ID'] }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $fromAI('rowNumber', 'Row number of the appointment obtained from view_appointments') }}",
+            "Status": "Cancelled"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": []
+        },
+        "options": {},
+        "description": "Mark an existing appointment as Cancelled in the Google Sheets Appointments table. Input: rowNumber (obtained from view_appointments). Sets Status to 'Cancelled'. After calling this, call delete_google_calendar_event with the calendarEventId also obtained from view_appointments."
       },
       "id": "f1a2b3c4-d013-4013-a013-d13000000013",
       "name": "Cancel Appointment Tool",
-      "type": "@n8n/n8n-nodes-langchain.toolCode",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
       "position": [
         1360,
         580
@@ -275,7 +388,7 @@
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "google-sheets-credential-id",
-          "name": "Google Sheets OAuth2"
+          "name": "Google Sheets Account"
         }
       }
     },
